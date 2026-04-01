@@ -1,0 +1,17 @@
+{
+  "controls": {
+    "led": "OFF",
+    "servo": "0"
+  },
+  "status": {
+    "led": "OFF",
+    "servo": "0"
+  },
+  "history": {
+    "entry_001": {
+      "device": "LED",
+      "action": "OFF",
+      "time": "2024-01-01 00:00:00"
+    }
+  }
+}

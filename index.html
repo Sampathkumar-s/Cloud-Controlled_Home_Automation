@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Smart Light Control</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script>
+    firebase.initializeApp({
+      apiKey:            "AIzaSyCyfeV54y8udccB9MA3idNV54uxtJx-GTM",
+      authDomain:        "smart-light-eec9a.firebaseapp.com",
+      projectId:         "smart-light-eec9a",
+      storageBucket:     "smart-light-eec9a.firebasestorage.app",
+      messagingSenderId: "604851738400",
+      appId:             "1:604851738400:web:b47716aaf3cc35f2fea945",
+      measurementId:     "G-QCLJ3YZMPV",
+      databaseURL:       "https://smart-light-eec9a-default-rtdb.firebaseio.com"
+    });
+    const db = firebase.database();
+  </script>
+
+  <style>
+    :root {
+      --ink:        #0f1117;
+      --ink2:       #1c2030;
+      --muted:      #6b7591;
+      --border:     #e2e6f0;
+      --surface:    #f7f8fc;
+      --white:      #ffffff;
+      --amber:      #f59e0b;
+      --amber-lt:   #fef3c7;
+      --emerald:    #10b981;
+      --emerald-lt: #d1fae5;
+      --rose:       #f43f5e;
+      --rose-lt:    #ffe4e6;
+      --blue:       #3b82f6;
+      --blue-lt:    #dbeafe;
+      --violet:     #8b5cf6;
+      --violet-lt:  #ede9fe;
+      --text:       #374151;
+      --text-sm:    #6b7280;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--surface);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Nav ── */
+    nav {
+      background: var(--white);
+      border-bottom: 1px solid var(--border);
+      padding: 0 40px; height: 60px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+
+    .nav-brand { display: flex; align-items: center; gap: 10px; }
+
+    .nav-icon {
+      width: 32px; height: 32px; background: var(--ink);
+      border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    }
+    .nav-icon svg { width: 18px; height: 18px; fill: white; }
+
+    .nav-title {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.15rem; color: var(--ink);
+    }
+
+    .conn-pill {
+      display: flex; align-items: center; gap: 7px;
+      padding: 5px 14px; border-radius: 20px;
+      background: var(--surface); border: 1px solid var(--border);
+      font-family: 'DM Mono', monospace; font-size: 0.7rem;
+      color: var(--muted); transition: all .3s;
+    }
+    .conn-pill.connected { background: var(--emerald-lt); border-color: #a7f3d0; color: #065f46; }
+    .conn-pill.error     { background: var(--rose-lt);    border-color: #fecdd3; color: #9f1239; }
+
+    .conn-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--muted); transition: background .3s;
+    }
+    .conn-pill.connected .conn-dot { background: var(--emerald); }
+    .conn-pill.error     .conn-dot { background: var(--rose); }
+
+    /* ── Main ── */
+    main { max-width: 900px; margin: 0 auto; padding: 40px 24px 60px; }
+
+    .page-head { margin-bottom: 32px; }
+    .page-head h2 {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.9rem; color: var(--ink); margin-bottom: 4px;
+    }
+    .page-head p { font-size: 0.88rem; color: var(--text-sm); }
+
+    .section-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem; font-weight: 500;
+      letter-spacing: 2px; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 12px;
+    }
+
+    /* ── Device Grid ── */
+    .device-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px; margin-bottom: 32px;
+    }
+
+    .device-card {
+      background: var(--white);
+      border: 1.5px solid var(--border);
+      border-radius: 16px; padding: 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.04);
+      transition: border-color .3s, box-shadow .3s, transform .2s;
+    }
+    .device-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.08); }
+    .device-card.active-led   { border-color: var(--amber);  box-shadow: 0 4px 20px rgba(245,158,11,.18); }
+    .device-card.active-servo { border-color: var(--violet); box-shadow: 0 4px 20px rgba(139,92,246,.18); }
+
+    .card-top {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; margin-bottom: 20px;
+    }
+
+    .device-icon {
+      width: 48px; height: 48px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--surface); border: 1px solid var(--border);
+      transition: all .3s;
+    }
+    .device-card.active-led   .device-icon { background: var(--amber-lt);  border-color: #fcd34d; }
+    .device-card.active-servo .device-icon { background: var(--violet-lt); border-color: #c4b5fd; }
+    .device-icon svg { width: 24px; height: 24px; }
+
+    .status-pill {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem; letter-spacing: 1.5px; text-transform: uppercase;
+      padding: 4px 10px; border-radius: 20px;
+      background: var(--surface); color: var(--muted);
+      border: 1px solid var(--border); transition: all .3s;
+    }
+    .device-card.active-led   .status-pill { background: var(--amber-lt);  color: #92400e; border-color: #fcd34d; }
+    .device-card.active-servo .status-pill { background: var(--violet-lt); color: #5b21b6; border-color: #c4b5fd; }
+
+    .device-name {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.3rem; color: var(--ink); margin-bottom: 4px;
+    }
+    .device-desc { font-size: 0.78rem; color: var(--text-sm); margin-bottom: 20px; }
+
+    /* LED power button */
+    .power-btn {
+      width: 100%; padding: 11px; border-radius: 10px;
+      border: 1.5px solid var(--border); background: var(--surface);
+      font-family: 'DM Sans', sans-serif; font-weight: 600;
+      font-size: 0.85rem; color: var(--text-sm);
+      cursor: pointer; transition: all .2s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .power-btn:hover { background: var(--border); }
+    .device-card.active-led .power-btn { background: var(--amber); border-color: var(--amber); color: white; }
+    .power-btn svg { width: 16px; height: 16px; }
+
+    /* ── Servo Controls ── */
+    .servo-controls { display: flex; flex-direction: column; gap: 12px; }
+
+    .servo-angle-display {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; border-radius: 10px;
+      background: var(--surface); border: 1px solid var(--border);
+    }
+
+    .angle-label { font-size: 0.78rem; color: var(--text-sm); }
+
+    .angle-value {
+      font-family: 'DM Mono', monospace;
+      font-size: 1.1rem; font-weight: 500; color: var(--violet);
+    }
+
+    /* Angle slider */
+    .servo-slider {
+      width: 100%; appearance: none;
+      height: 6px; border-radius: 3px;
+      background: linear-gradient(to right, var(--violet) 0%, var(--violet) var(--pct, 0%), var(--border) var(--pct, 0%));
+      outline: none; cursor: pointer; transition: background .1s;
+    }
+    .servo-slider::-webkit-slider-thumb {
+      appearance: none; width: 18px; height: 18px;
+      border-radius: 50%; background: var(--violet);
+      border: 2px solid white; box-shadow: 0 1px 4px rgba(139,92,246,.4);
+      cursor: pointer;
+    }
+
+    /* Quick angle buttons */
+    .angle-btns {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+    }
+
+    .angle-btn {
+      padding: 7px 4px; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--surface);
+      font-family: 'DM Mono', monospace; font-size: 0.72rem;
+      color: var(--text-sm); cursor: pointer; transition: all .2s;
+      text-align: center;
+    }
+    .angle-btn:hover        { border-color: var(--violet); color: var(--violet); background: var(--violet-lt); }
+    .angle-btn.active-angle { border-color: var(--violet); color: var(--violet); background: var(--violet-lt); font-weight: 500; }
+
+    /* ── Bottom Grid ── */
+    .bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    .panel {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: 16px; padding: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.04);
+    }
+
+    .panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px; padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-title { font-family: 'DM Serif Display', serif; font-size: 1rem; color: var(--ink); }
+
+    .btn-sm {
+      background: none; border: 1px solid var(--border);
+      border-radius: 6px; padding: 4px 10px;
+      font-family: 'DM Mono', monospace; font-size: 0.65rem;
+      color: var(--muted); cursor: pointer; letter-spacing: 1px; transition: all .2s;
+    }
+    .btn-sm:hover { border-color: var(--blue); color: var(--blue); }
+
+    /* Log */
+    #log { list-style: none; display: flex; flex-direction: column; gap: 5px; max-height: 220px; overflow-y: auto; }
+    #log li { display: flex; gap: 10px; font-size: 0.78rem; align-items: baseline; }
+    #log li .time { font-family: 'DM Mono', monospace; font-size: 0.68rem; color: var(--muted); flex-shrink: 0; }
+    #log li.ok   .msg { color: var(--emerald); font-weight: 500; }
+    #log li.err  .msg { color: var(--rose);    font-weight: 500; }
+    #log li.info .msg { color: var(--blue);    font-weight: 500; }
+    #log::-webkit-scrollbar { width: 3px; }
+    #log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* History */
+    #historyList { list-style: none; display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
+
+    .history-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 7px 10px; border-radius: 8px;
+      background: var(--surface); border: 1px solid var(--border);
+    }
+    .h-dev { font-family: 'DM Mono', monospace; font-size: 0.7rem; font-weight: 500; color: var(--ink2); min-width: 50px; }
+    .h-badge {
+      font-family: 'DM Mono', monospace; font-size: 0.62rem;
+      font-weight: 500; padding: 2px 8px; border-radius: 10px; letter-spacing: 1px;
+    }
+    .h-badge.on    { background: var(--emerald-lt); color: #065f46; }
+    .h-badge.off   { background: var(--rose-lt);    color: #9f1239; }
+    .h-badge.servo { background: var(--violet-lt);  color: #5b21b6; }
+    .h-time { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); margin-left: auto; }
+
+    .empty-state { text-align: center; padding: 28px 0; font-size: 0.82rem; color: var(--muted); }
+
+    #historyList::-webkit-scrollbar { width: 3px; }
+    #historyList::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .device-card { animation: fadeUp .4s ease both; }
+    .device-grid .device-card:nth-child(2) { animation-delay: .08s; }
+    .panel { animation: fadeUp .4s ease both; }
+    .bottom-grid .panel:nth-child(2) { animation-delay: .08s; }
+
+    @media (max-width: 560px) {
+      nav { padding: 0 16px; }
+      main { padding: 24px 16px 48px; }
+      .device-grid, .bottom-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="nav-brand">
+      <div class="nav-icon">
+        <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      </div>
+      <span class="nav-title">Smart Light</span>
+    </div>
+    <div class="conn-pill" id="connPill">
+      <div class="conn-dot"></div>
+      <span id="connText">Connecting...</span>
+    </div>
+  </nav>
+
+  <main>
+
+    <div class="page-head">
+      <h2>Device Dashboard</h2>
+      <p>smart-light-eec9a · Firebase Realtime Database</p>
+    </div>
+
+    <div class="section-label">Devices</div>
+    <div class="device-grid">
+
+      <!-- LED Card -->
+      <div class="device-card" id="ledCard">
+        <div class="card-top">
+          <div class="device-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21h6M12 3a6 6 0 0 1 4 10.47V17H8v-3.53A6 6 0 0 1 12 3z"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+            </svg>
+          </div>
+          <span class="status-pill" id="ledStatus">Inactive</span>
+        </div>
+        <div class="device-name">LED Light</div>
+        <div class="device-desc">GPIO 2 · Digital Output</div>
+        <button class="power-btn" onclick="toggleLED()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/>
+          </svg>
+          <span id="ledBtnText">Turn On</span>
+        </button>
+      </div>
+
+      <!-- Servo Card -->
+      <div class="device-card" id="servoCard">
+        <div class="card-top">
+          <div class="device-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+            </svg>
+          </div>
+          <span class="status-pill" id="servoStatus">0°</span>
+        </div>
+        <div class="device-name">Servo Motor</div>
+        <div class="device-desc">GPIO 13 · PWM Signal</div>
+
+        <div class="servo-controls">
+          <!-- Angle display -->
+          <div class="servo-angle-display">
+            <span class="angle-label">Current Angle</span>
+            <span class="angle-value" id="angleDisplay">0°</span>
+          </div>
+
+          <!-- Slider -->
+          <input
+            type="range" min="0" max="180" value="0"
+            class="servo-slider" id="servoSlider"
+            oninput="onSliderMove(this.value)"
+            onchange="sendServoAngle(this.value)"
+          />
+
+          <!-- Quick buttons -->
+          <div class="angle-btns">
+            <button class="angle-btn active-angle" onclick="setAngle(0)">0°</button>
+            <button class="angle-btn" onclick="setAngle(45)">45°</button>
+            <button class="angle-btn" onclick="setAngle(90)">90°</button>
+            <button class="angle-btn" onclick="setAngle(180)">180°</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="section-label">Activity</div>
+    <div class="bottom-grid">
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Live Log</span>
+          <button class="btn-sm" onclick="clearLog()">CLEAR</button>
+        </div>
+        <ul id="log">
+          <li class="info"><span class="time">--:--:--</span><span class="msg">Connecting to Firebase...</span></li>
+        </ul>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">History</span>
+          <button class="btn-sm" onclick="loadHistory()">REFRESH</button>
+        </div>
+        <ul id="historyList">
+          <li><div class="empty-state">Loading history...</div></li>
+        </ul>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    let ledState   = false;
+    let servoAngle = 0;
+
+    // ── Connect on load ───────────────────────────────────
+    window.addEventListener('load', () => {
+      db.ref('/controls').once('value')
+        .then(() => {
+          setConn(true);
+          addLog('ok', 'Connected to smart-light-eec9a');
+          listenStatus();
+          loadHistory();
+        })
+        .catch(err => {
+          setConn(false);
+          addLog('err', 'Firebase error: ' + err.message);
+        });
+    });
+
+    function setConn(ok) {
+      const pill = document.getElementById('connPill');
+      pill.className = 'conn-pill ' + (ok ? 'connected' : 'error');
+      document.getElementById('connText').textContent = ok ? 'Firebase connected' : 'Connection failed';
+    }
+
+    // ── LED Toggle ────────────────────────────────────────
+    function toggleLED() {
+      const newState = !ledState;
+      const value    = newState ? 'ON' : 'OFF';
+      db.ref('/controls/led').set(value)
+        .then(() => {
+          ledState = newState;
+          updateLEDCard(newState);
+          addLog('ok', 'LED → ' + value);
+        })
+        .catch(err => addLog('err', 'LED failed: ' + err.message));
+    }
+
+    function updateLEDCard(isOn) {
+      const card    = document.getElementById('ledCard');
+      const status  = document.getElementById('ledStatus');
+      const btnText = document.getElementById('ledBtnText');
+      if (isOn) {
+        card.classList.add('active-led');
+        status.textContent  = 'Active';
+        btnText.textContent = 'Turn Off';
+      } else {
+        card.classList.remove('active-led');
+        status.textContent  = 'Inactive';
+        btnText.textContent = 'Turn On';
+      }
+    }
+
+    // ── Servo Controls ────────────────────────────────────
+    function onSliderMove(val) {
+      // Update UI instantly while dragging
+      updateServoUI(val);
+    }
+
+    function sendServoAngle(val) {
+      // Send to Firebase when slider released
+      val = parseInt(val);
+      db.ref('/controls/servo').set(String(val))
+        .then(() => {
+          servoAngle = val;
+          addLog('ok', 'Servo → ' + val + '°');
+        })
+        .catch(err => addLog('err', 'Servo failed: ' + err.message));
+    }
+
+    function setAngle(angle) {
+      document.getElementById('servoSlider').value = angle;
+      updateServoUI(angle);
+      db.ref('/controls/servo').set(String(angle))
+        .then(() => {
+          servoAngle = angle;
+          addLog('ok', 'Servo → ' + angle + '°');
+        })
+        .catch(err => addLog('err', 'Servo failed: ' + err.message));
+    }
+
+    function updateServoUI(angle) {
+      angle = parseInt(angle);
+      const pct = (angle / 180) * 100;
+
+      document.getElementById('angleDisplay').textContent = angle + '°';
+      document.getElementById('servoStatus').textContent  = angle + '°';
+      document.getElementById('servoSlider').style.setProperty('--pct', pct + '%');
+
+      // Highlight active quick button
+      document.querySelectorAll('.angle-btn').forEach(btn => {
+        btn.classList.toggle('active-angle', parseInt(btn.textContent) === angle);
+      });
+
+      // Card border active if angle > 0
+      document.getElementById('servoCard').classList.toggle('active-servo', angle > 0);
+    }
+
+    // ── Listen to ESP32 status ────────────────────────────
+    function listenStatus() {
+      db.ref('/status').on('value', snapshot => {
+        const data = snapshot.val();
+        if (!data) return;
+        if (data.led !== undefined) {
+          const isOn = data.led === 'ON';
+          if (isOn !== ledState) { ledState = isOn; updateLEDCard(isOn); }
+        }
+        if (data.servo !== undefined) {
+          updateServoUI(parseInt(data.servo));
+        }
+      });
+    }
+
+    // ── Load History ──────────────────────────────────────
+    function loadHistory() {
+      db.ref('/history').limitToLast(20).once('value')
+        .then(snapshot => {
+          const data = snapshot.val();
+          const list = document.getElementById('historyList');
+          list.innerHTML = '';
+
+          if (!data) {
+            list.innerHTML = '<li><div class="empty-state">No history yet</div></li>';
+            return;
+          }
+
+          const entries = Object.values(data).reverse();
+          entries.forEach(e => {
+            const li  = document.createElement('li');
+            li.className = 'history-item';
+            const isLED   = e.device === 'LED';
+            const badgeCls = isLED
+              ? (e.action === 'ON' ? 'on' : 'off')
+              : 'servo';
+            li.innerHTML = `
+              <span class="h-dev">${e.device}</span>
+              <span class="h-badge ${badgeCls}">${e.action}</span>
+              <span class="h-time">${e.time}</span>
+            `;
+            list.appendChild(li);
+          });
+          addLog('info', entries.length + ' records loaded');
+        })
+        .catch(err => addLog('err', 'History error: ' + err.message));
+    }
+
+    // ── Log ───────────────────────────────────────────────
+    function addLog(type, msg) {
+      const log = document.getElementById('log');
+      const li  = document.createElement('li');
+      li.className = type;
+      const t = new Date().toLocaleTimeString('en-GB');
+      li.innerHTML = `<span class="time">${t}</span><span class="msg">${msg}</span>`;
+      log.prepend(li);
+      if (log.children.length > 30) log.lastElementChild.remove();
+    }
+
+    function clearLog() {
+      document.getElementById('log').innerHTML =
+        '<li class="info"><span class="time">--:--:--</span><span class="msg">Log cleared</span></li>';
+    }
+  </script>
+</body>
+</html>
